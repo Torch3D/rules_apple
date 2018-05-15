@@ -499,7 +499,7 @@ def _process_and_sign_archive(ctx,
     paths_to_sign = [
         codesigning_support.path_to_sign(
             "$WORK_DIR/" + bundle_path_in_archive + "/" + frameworks,
-            optional=True, glob="*"),
+            optional=True, glob="*", use_entitlements=False),
     ]
     is_device = platform_support.is_device_build(ctx)
     if is_device or codesigning_support.should_sign_simulator_bundles(ctx):

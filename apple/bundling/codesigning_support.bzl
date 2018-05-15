@@ -180,7 +180,7 @@ def _codesign_command(ctx, path_to_sign, entitlements_file):
   # to the directory where the bundle is being built.
   if platform_support.is_device_build(ctx):
     entitlements_flag = ""
-    if entitlements_file:
+    if entitlements_file and path_to_sign.use_entitlements:
       entitlements_flag = (
           "--entitlements %s" % shell.quote(entitlements_file.path))
 
@@ -192,7 +192,7 @@ def _codesign_command(ctx, path_to_sign, entitlements_file):
              "--timestamp=none --sign \"-\" %s") % path)
 
 
-def _path_to_sign(path, optional=False, glob=None):
+def _path_to_sign(path, optional=False, glob=None, use_entitlements=True):
   """Returns a "path to sign" value to be passed to `signing_command_lines`.
 
   Args:
@@ -210,7 +210,7 @@ def _path_to_sign(path, optional=False, glob=None):
   Returns:
     A `struct` that can be passed to `signing_command_lines`.
   """
-  return struct(path=path, optional=optional, glob=glob)
+  return struct(path=path, optional=optional, glob=glob, use_entitlements=use_entitlements)
 
 
 def _signing_command_lines(ctx,
