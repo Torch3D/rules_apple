@@ -15,12 +15,16 @@
 """Partial implementation for AppleDynamicFrameworkInfo configuration."""
 
 load(
-    "@build_bazel_rules_apple//apple/bundling:bundling_support.bzl",
+    "@build_bazel_rules_apple//apple/internal:bundling_support.bzl",
     "bundling_support",
 )
 load(
-    "@build_bazel_rules_apple//apple/bundling:file_actions.bzl",
-    "file_actions",
+    "@build_bazel_rules_apple//apple/internal:file_support.bzl",
+    "file_support",
+)
+load(
+    "@build_bazel_apple_support//lib:framework_migration.bzl",
+    "framework_migration",
 )
 load(
     "@bazel_skylib//lib:partial.bzl",
@@ -31,9 +35,8 @@ load(
     "paths",
 )
 
-def _framework_provider_partial_impl(ctx):
+def _framework_provider_partial_impl(ctx, binary_provider):
     """Implementation for the framework provider partial."""
-    binary_provider = ctx.attr.deps[0][apple_common.AppleDylibBinary]
     binary_file = binary_provider.binary
 
     bundle_name = bundling_support.bundle_name(ctx)
@@ -46,7 +49,7 @@ def _framework_provider_partial_impl(ctx):
     framework_file = ctx.actions.declare_file(
         paths.join(framework_dir, bundle_name),
     )
-    file_actions.symlink(ctx, binary_file, framework_file)
+    file_support.symlink(ctx, binary_file, framework_file)
 
     absolute_framework_dir = paths.join(
         ctx.bin_dir.path,
@@ -56,11 +59,17 @@ def _framework_provider_partial_impl(ctx):
 
     # TODO(cparsons): These will no longer be necessary once apple_binary
     # uses the values in the dynamic framework provider.
-    legacy_objc_provider = apple_common.new_objc_provider(
-        dynamic_framework_dir = depset([absolute_framework_dir]),
-        dynamic_framework_file = depset([framework_file]),
-        providers = [binary_provider.objc],
-    )
+    if framework_migration.is_post_framework_migration():
+        legacy_objc_provider = apple_common.new_objc_provider(
+            dynamic_framework_file = depset([framework_file]),
+            providers = [binary_provider.objc],
+        )
+    else:
+        legacy_objc_provider = apple_common.new_objc_provider(
+            dynamic_framework_dir = depset([absolute_framework_dir]),
+            dynamic_framework_file = depset([framework_file]),
+            providers = [binary_provider.objc],
+        )
 
     framework_provider = apple_common.new_dynamic_framework_provider(
         binary = binary_file,
@@ -73,7 +82,7 @@ def _framework_provider_partial_impl(ctx):
         providers = [framework_provider],
     )
 
-def framework_provider_partial():
+def framework_provider_partial(binary_provider):
     """Constructor for the framework provider partial.
 
     This partial propagates the AppleDynamicFrameworkInfo provider required by
@@ -81,10 +90,14 @@ def framework_provider_partial():
     the framework can be linked against. This is only required for dynamic
     framework bundles.
 
+    Args:
+      binary_provider: The AppleDylibBinary provider containing this target's binary.
+
     Returns:
       A partial that returns the AppleDynamicFrameworkInfo provider used to link
       this framework into the final binary.
     """
     return partial.make(
         _framework_provider_partial_impl,
+        binary_provider = binary_provider,
     )

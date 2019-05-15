@@ -12,15 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Experimental implementation of macOS rules."""
+"""Implementation of macOS rules."""
 
 load(
     "@build_bazel_rules_apple//apple/internal:apple_product_type.bzl",
     "apple_product_type",
 )
 load(
-    "@build_bazel_rules_apple//apple/internal:codesigning_actions.bzl",
-    "codesigning_actions",
+    "@build_bazel_rules_apple//apple/internal:codesigning_support.bzl",
+    "codesigning_support",
+)
+load(
+    "@build_bazel_rules_apple//apple/internal:linking_support.bzl",
+    "linking_support",
 )
 load(
     "@build_bazel_rules_apple//apple/internal:outputs.bzl",
@@ -39,12 +43,17 @@ load(
     "rule_factory",
 )
 load(
+    "@build_bazel_rules_apple//apple/internal:run_support.bzl",
+    "run_support",
+)
+load(
     "@build_bazel_rules_apple//apple:providers.bzl",
     "AppleBinaryInfo",
     "MacosApplicationBundleInfo",
     "MacosBundleBundleInfo",
     "MacosExtensionBundleInfo",
     "MacosKernelExtensionBundleInfo",
+    "MacosQuickLookPluginBundleInfo",
     "MacosSpotlightImporterBundleInfo",
     "MacosXPCServiceBundleInfo",
 )
@@ -106,18 +115,17 @@ def _macos_application_impl(ctx):
 
     processor_result = processor.process(ctx, processor_partials)
 
-    # TODO(kaipi): Add support for `bazel run` for macos_application.
-    executable = ctx.actions.declare_file(ctx.label.name)
-    ctx.actions.write(
-        executable,
-        "#!/bin/bash\necho Unimplemented",
-        is_executable = True,
-    )
-
+    executable = outputs.executable(ctx)
+    run_support.register_macos_executable(ctx, executable)
     return [
         DefaultInfo(
             executable = executable,
             files = processor_result.output_files,
+            runfiles = ctx.runfiles(
+                files = [
+                    outputs.archive(ctx),
+                ],
+            ),
         ),
         MacosApplicationBundleInfo(),
         # Propagate the binary provider so that this target can be used as bundle_loader in test
@@ -179,10 +187,9 @@ def _macos_bundle_impl(ctx):
 
 def _macos_extension_impl(ctx):
     """Experimental implementation of macos_extension."""
-    binary_provider_struct = apple_common.link_multi_arch_binary(ctx = ctx)
-    binary_provider = binary_provider_struct.binary_provider
-    debug_outputs_provider = binary_provider_struct.debug_outputs_provider
-    binary_artifact = binary_provider.binary
+    binary_descriptor = linking_support.register_linking_action(ctx)
+    binary_artifact = binary_descriptor.artifact
+    debug_outputs_provider = binary_descriptor.debug_outputs_provider
 
     bundle_id = ctx.attr.bundle_id
 
@@ -223,12 +230,61 @@ def _macos_extension_impl(ctx):
         MacosExtensionBundleInfo(),
     ] + processor_result.providers
 
+def _macos_quick_look_plugin_impl(ctx):
+    """Experimental implementation of macos_quick_look_plugin."""
+    extra_linkopts = [
+        "-install_name",
+        "\"/Library/Frameworks/{0}.qlgenerator/{0}\"".format(ctx.attr.bundle_name),
+    ]
+    binary_descriptor = linking_support.register_linking_action(ctx, extra_linkopts)
+    binary_artifact = binary_descriptor.artifact
+    debug_outputs_provider = binary_descriptor.debug_outputs_provider
+
+    bundle_id = ctx.attr.bundle_id
+
+    processor_partials = [
+        partials.apple_bundle_info_partial(bundle_id = bundle_id),
+        partials.binary_partial(binary_artifact = binary_artifact),
+        # TODO(kaipi): Check if clang_rt dylibs are needed in Quick Look plugins, or if
+        # they can be skipped.
+        partials.clang_rt_dylibs_partial(binary_artifact = binary_artifact),
+        partials.debug_symbols_partial(
+            debug_dependencies = ctx.attr.additional_contents.keys(),
+            debug_outputs_provider = debug_outputs_provider,
+        ),
+        partials.embedded_bundles_partial(
+            frameworks = [outputs.archive(ctx)],
+        ),
+        partials.macos_additional_contents_partial(),
+        partials.resources_partial(
+            bundle_id = bundle_id,
+            plist_attrs = ["infoplists"],
+            top_level_attrs = [
+                "strings",
+            ],
+        ),
+        partials.swift_dylibs_partial(
+            binary_artifact = binary_artifact,
+        ),
+    ]
+
+    if ctx.file.provisioning_profile:
+        processor_partials.append(
+            partials.provisioning_profile_partial(profile_artifact = ctx.file.provisioning_profile),
+        )
+
+    processor_result = processor.process(ctx, processor_partials)
+
+    return [
+        DefaultInfo(files = processor_result.output_files),
+        MacosQuickLookPluginBundleInfo(),
+    ] + processor_result.providers
+
 def _macos_kernel_extension_impl(ctx):
     """Implementation of macos_kernel_extension."""
-    binary_provider_struct = apple_common.link_multi_arch_binary(ctx = ctx)
-    binary_provider = binary_provider_struct.binary_provider
-    debug_outputs_provider = binary_provider_struct.debug_outputs_provider
-    binary_artifact = binary_provider.binary
+    binary_descriptor = linking_support.register_linking_action(ctx)
+    binary_artifact = binary_descriptor.artifact
+    debug_outputs_provider = binary_descriptor.debug_outputs_provider
 
     bundle_id = ctx.attr.bundle_id
 
@@ -269,10 +325,9 @@ def _macos_kernel_extension_impl(ctx):
 
 def _macos_spotlight_importer_impl(ctx):
     """Implementation of macos_spotlight_importer."""
-    binary_provider_struct = apple_common.link_multi_arch_binary(ctx = ctx)
-    binary_provider = binary_provider_struct.binary_provider
-    debug_outputs_provider = binary_provider_struct.debug_outputs_provider
-    binary_artifact = binary_provider.binary
+    binary_descriptor = linking_support.register_linking_action(ctx)
+    binary_artifact = binary_descriptor.artifact
+    debug_outputs_provider = binary_descriptor.debug_outputs_provider
 
     bundle_id = ctx.attr.bundle_id
 
@@ -313,10 +368,9 @@ def _macos_spotlight_importer_impl(ctx):
 
 def _macos_xpc_service_impl(ctx):
     """Implementation of macos_xpc_service."""
-    binary_provider_struct = apple_common.link_multi_arch_binary(ctx = ctx)
-    binary_provider = binary_provider_struct.binary_provider
-    debug_outputs_provider = binary_provider_struct.debug_outputs_provider
-    binary_artifact = binary_provider.binary
+    binary_descriptor = linking_support.register_linking_action(ctx)
+    binary_artifact = binary_descriptor.artifact
+    debug_outputs_provider = binary_descriptor.debug_outputs_provider
 
     bundle_id = ctx.attr.bundle_id
 
@@ -374,7 +428,7 @@ def _macos_command_line_application_impl(ctx):
     outputs.append(result.output_files)
     providers.extend(result.providers)
 
-    codesigning_actions.sign_binary_action(ctx, binary_artifact, output_file)
+    codesigning_support.sign_binary_action(ctx, binary_artifact, output_file)
 
     return [
         AppleBinaryInfo(
@@ -406,7 +460,7 @@ def _macos_dylib_impl(ctx):
     outputs.append(result.output_files)
     providers.extend(result.providers)
 
-    codesigning_actions.sign_binary_action(ctx, binary_artifact, output_file)
+    codesigning_support.sign_binary_action(ctx, binary_artifact, output_file)
 
     return [
         AppleBinaryInfo(
@@ -435,6 +489,13 @@ macos_extension = rule_factory.create_apple_bundling_rule(
     platform_type = "macos",
     product_type = apple_product_type.app_extension,
     doc = "Builds and bundles a macOS Application Extension.",
+)
+
+macos_quick_look_plugin = rule_factory.create_apple_bundling_rule(
+    implementation = _macos_quick_look_plugin_impl,
+    platform_type = "macos",
+    product_type = apple_product_type.quicklook_plugin,
+    doc = "Builds and bundles a macOS Quick Look Plugin.",
 )
 
 macos_kernel_extension = rule_factory.create_apple_bundling_rule(

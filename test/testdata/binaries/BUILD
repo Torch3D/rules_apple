@@ -7,12 +7,22 @@ licenses(["notice"])
 apple_binary(
     name = "empty_dylib",
     binary_type = "dylib",
+    minimum_os_version = "9.0",
     platform_type = "ios",
+    deps = [":dummy_lib"],
+)
+
+apple_binary(
+    name = "empty_tvos_dylib",
+    binary_type = "dylib",
+    minimum_os_version = "10.2",
+    platform_type = "tvos",
     deps = [":dummy_lib"],
 )
 
 apple_static_library(
     name = "empty_staticlib",
+    minimum_os_version = "9.0",
     platform_type = "ios",
     deps = [":dummy_lib"],
 )

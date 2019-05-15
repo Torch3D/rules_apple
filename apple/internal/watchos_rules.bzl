@@ -12,15 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Experimental implementation of watchOS rules."""
+"""Implementation of watchOS rules."""
 
-load(
-    "@build_bazel_rules_apple//apple/bundling:platform_support.bzl",
-    "platform_support",
-)
 load(
     "@build_bazel_rules_apple//apple/internal:apple_product_type.bzl",
     "apple_product_type",
+)
+load(
+    "@build_bazel_rules_apple//apple/internal:linking_support.bzl",
+    "linking_support",
 )
 load(
     "@build_bazel_rules_apple//apple/internal:outputs.bzl",
@@ -29,6 +29,10 @@ load(
 load(
     "@build_bazel_rules_apple//apple/internal:partials.bzl",
     "partials",
+)
+load(
+    "@build_bazel_rules_apple//apple/internal:platform_support.bzl",
+    "platform_support",
 )
 load(
     "@build_bazel_rules_apple//apple/internal:processor.bzl",
@@ -126,10 +130,9 @@ def _watchos_extension_impl(ctx):
         "strings",
     ]
 
-    binary_provider_struct = apple_common.link_multi_arch_binary(ctx = ctx)
-    binary_provider = binary_provider_struct.binary_provider
-    debug_outputs_provider = binary_provider_struct.debug_outputs_provider
-    binary_artifact = binary_provider.binary
+    binary_descriptor = linking_support.register_linking_action(ctx)
+    binary_artifact = binary_descriptor.artifact
+    debug_outputs_provider = binary_descriptor.debug_outputs_provider
 
     bundle_id = ctx.attr.bundle_id
 

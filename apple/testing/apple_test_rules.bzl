@@ -17,8 +17,8 @@
 load(
     "@build_bazel_rules_apple//apple/internal/testing:apple_test_rules.bzl",
     _AppleTestInfo = "AppleTestInfo",
-    _AppleTestRunner = "AppleTestRunner",
-    _CoverageFiles = "CoverageFiles",
+    _AppleTestRunnerInfo = "AppleTestRunnerInfo",
+    _CoverageFilesInfo = "CoverageFilesInfo",
     _coverage_files_aspect = "coverage_files_aspect",
 )
 
@@ -26,6 +26,6 @@ load(
 # TODO(kaipi): Find a better location for test providers to export them as public interface from
 # rules_apple.
 AppleTestInfo = _AppleTestInfo
-AppleTestRunner = _AppleTestRunner
-CoverageFiles = _CoverageFiles
+AppleTestRunnerInfo = _AppleTestRunnerInfo
+CoverageFilesInfo = _CoverageFilesInfo
 coverage_files_aspect = _coverage_files_aspect

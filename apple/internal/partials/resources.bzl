@@ -151,8 +151,8 @@ def _deduplicate(resources_provider, avoid_provider, field):
                 # add the resource to be bundled in the bundle represented by resource_provider.
                 deduped_owners = [
                     o
-                    for o in resources_provider.owners[short_path]
-                    if o not in avoid_provider.owners[short_path]
+                    for o in resources_provider.owners[short_path].to_list()
+                    if o not in avoid_provider.owners[short_path].to_list()
                 ]
                 if deduped_owners:
                     deduped_files.append(to_bundle_file)
@@ -202,16 +202,16 @@ def _locale_for_path(resource_path):
 
     return resource_path[locale_start + 1:loc]
 
-def _validate_processed_locales(locales_requested, locales_included, locales_dropped):
+def _validate_processed_locales(label, locales_requested, locales_included, locales_dropped):
     """Prints a warning if locales were dropped and none of the requested ones were included."""
     if sets.length(locales_dropped):
         # Display a warning if a locale was dropped and there are unfulfilled locale requests; it
         # could mean that the user made a mistake in defining the locales they want to keep.
         if not sets.is_equal(locales_requested, locales_included):
             unused_locales = sets.difference(locales_requested, locales_included)
-            print("Warning: Did not have resources that matched " + sets.str(unused_locales) +
-                  " in locale filter. Please verify apple.locales_to_include is defined" +
-                  " properly.")
+            print("Warning: " + str(label) + " did not have resources that matched " +
+                  sets.str(unused_locales) + " in locale filter. Please verify " +
+                  "apple.locales_to_include is defined properly.")
 
 def _resources_partial_impl(
         ctx,
@@ -245,6 +245,15 @@ def _resources_partial_impl(
         )
         providers.append(plist_provider)
 
+    if not providers:
+        # If there are no resource providers, return early, since there is nothing to process.
+        # Most rules will always have at least one resource since they have a mandatory infoplists
+        # attribute, but not ios_static_framework. This rule can be perfectly valid without any
+        # resource.
+        return struct()
+
+    final_provider = resources.merge_providers(providers, default_owner = str(ctx.label))
+
     avoid_providers = [
         x[AppleResourceInfo]
         for x in targets_to_avoid
@@ -260,14 +269,13 @@ def _resources_partial_impl(
             validate_all_resources_owned = True,
         )
 
-    final_provider = resources.merge_providers(providers, default_owner = str(ctx.label))
-
     # Map of resource provider fields to a tuple that contains the method to use to process those
     # resources and a boolean indicating whether the Swift module is required for that processing.
     provider_field_to_action = {
         "asset_catalogs": (resources_support.asset_catalogs, False),
         "datamodels": (resources_support.datamodels, True),
         "infoplists": (resources_support.infoplists, False),
+        "mlmodels": (resources_support.mlmodels, False),
         "plists": (resources_support.plists_and_strings, False),
         "pngs": (resources_support.pngs, False),
         # TODO(b/113252360): Remove this once we can correctly process Fileset files.
@@ -320,7 +328,7 @@ def _resources_partial_impl(
                 infoplists.extend(result.infoplists)
 
     if locales_requested:
-        _validate_processed_locales(locales_requested, locales_included, locales_dropped)
+        _validate_processed_locales(ctx.label, locales_requested, locales_included, locales_dropped)
 
     if bundle_id:
         # If no bundle ID was given, do not process the root Info.plist and do not validate embedded

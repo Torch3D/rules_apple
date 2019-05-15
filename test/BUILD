@@ -1,9 +1,11 @@
 load(
     "//test:configurations.bzl",
+    "IOS_64BIT_SIMULATOR_FAT_DEVICE_CONFIGURATIONS",
     "IOS_CONFIGURATIONS",
     "IOS_TEST_CONFIGURATIONS",
     "MACOS_CONFIGURATIONS",
     "TVOS_CONFIGURATIONS",
+    "TVOS_TEST_CONFIGURATIONS",
     "WATCHOS_CONFIGURATIONS",
 )
 load(
@@ -76,6 +78,25 @@ apple_shell_test(
     shard_count = 8,
 )
 
+apple_shell_test(
+    name = "apple_core_ml_library_test",
+    size = "medium",
+    src = "apple_core_ml_library_test.sh",
+    data = [
+        "//test/testdata/resources:mlmodel_srcs",
+    ],
+)
+
+apple_shell_test(
+    name = "ios_framework_import_test",
+    size = "medium",
+    src = "ios_framework_import_test.sh",
+    data = [
+        "//test/testdata/frameworks:ios_frameworks",
+    ],
+    shard_count = 4,
+)
+
 apple_multi_shell_test(
     name = "ios_application_test",
     size = "large",
@@ -106,7 +127,7 @@ apple_multi_shell_test(
     name = "ios_application_swift_test",
     size = "medium",
     src = "ios_application_swift_test.sh",
-    configurations = IOS_CONFIGURATIONS,
+    configurations = IOS_64BIT_SIMULATOR_FAT_DEVICE_CONFIGURATIONS,
     shard_count = 4,
 )
 
@@ -257,6 +278,14 @@ apple_multi_shell_test(
 )
 
 apple_multi_shell_test(
+    name = "macos_quick_look_plugin_test",
+    size = "medium",
+    src = "macos_quick_look_plugin_test.sh",
+    configurations = MACOS_CONFIGURATIONS,
+    shard_count = 8,
+)
+
+apple_multi_shell_test(
     name = "tvos_application_test",
     size = "medium",
     src = "tvos_application_test.sh",
@@ -286,6 +315,18 @@ apple_multi_shell_test(
     src = "tvos_extension_swift_test.sh",
     configurations = TVOS_CONFIGURATIONS,
     shard_count = 2,
+)
+
+apple_multi_shell_test(
+    name = "tvos_framework_test",
+    size = "large",
+    src = "tvos_framework_test.sh",
+    configurations = TVOS_CONFIGURATIONS,
+    data = [
+        "//test/testdata/binaries:empty_tvos_dylib",
+        "//test/testdata/resources:resource_data_deps_platform_independent",
+    ],
+    shard_count = 12,
 )
 
 apple_multi_shell_test(
@@ -338,7 +379,7 @@ apple_multi_shell_test(
     name = "ios_application_clang_rt_test",
     size = "medium",
     src = "ios_application_clang_rt_test.sh",
-    configurations = IOS_CONFIGURATIONS,
+    configurations = IOS_64BIT_SIMULATOR_FAT_DEVICE_CONFIGURATIONS,
     shard_count = 4,
 )
 
@@ -358,6 +399,36 @@ apple_multi_shell_test(
     size = "medium",
     src = "macos_ui_test_test.sh",
     configurations = MACOS_CONFIGURATIONS,
+    data = [
+        "//test/testdata/rules:dummy_runner",
+    ],
+    shard_count = 7,
+)
+
+apple_multi_shell_test(
+    name = "tvos_unit_test_test",
+    size = "medium",
+    src = "tvos_unit_test_test.sh",
+    configurations = TVOS_TEST_CONFIGURATIONS,
+    data = [
+        "//test/testdata/binaries:empty_tvos_dylib",
+        "//test/testdata/rules:dummy_runner",
+    ],
+    shard_count = 8,
+)
+
+apple_multi_shell_test(
+    name = "tvos_unit_test_resources_test",
+    size = "medium",
+    src = "tvos_unit_test_resources_test.sh",
+    configurations = TVOS_TEST_CONFIGURATIONS,
+)
+
+apple_multi_shell_test(
+    name = "tvos_ui_test_test",
+    size = "medium",
+    src = "tvos_ui_test_test.sh",
+    configurations = TVOS_TEST_CONFIGURATIONS,
     data = [
         "//test/testdata/rules:dummy_runner",
     ],

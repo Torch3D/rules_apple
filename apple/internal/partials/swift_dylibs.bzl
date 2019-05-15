@@ -19,20 +19,24 @@ load(
     "apple_support",
 )
 load(
-    "@build_bazel_rules_apple//apple/bundling:platform_support.bzl",
-    "platform_support",
-)
-load(
-    "@build_bazel_rules_apple//apple/bundling:swift_support.bzl",
-    "swift_support",
-)
-load(
     "@build_bazel_rules_apple//apple/internal:intermediates.bzl",
     "intermediates",
 )
 load(
+    "@build_bazel_rules_apple//apple/internal:platform_support.bzl",
+    "platform_support",
+)
+load(
     "@build_bazel_rules_apple//apple/internal:processor.bzl",
     "processor",
+)
+load(
+    "@build_bazel_rules_apple//apple/internal:swift_support.bzl",
+    "swift_support",
+)
+load(
+    "@build_bazel_rules_apple//apple/internal/utils:defines.bzl",
+    "defines",
 )
 load(
     "@bazel_skylib//lib:partial.bzl",
@@ -88,7 +92,7 @@ def _swift_dylibs_partial_impl(
         binary_artifact,
         dependency_targets,
         bundle_dylibs,
-        package_swift_support):
+        package_swift_support_if_needed):
     """Implementation for the Swift dylibs processing partial."""
 
     # Collect transitive data.
@@ -102,17 +106,19 @@ def _swift_dylibs_partial_impl(
         provider = dependency[_AppleSwiftDylibsInfo]
         transitive_binary_sets.append(provider.binary)
         transitive_swift_support_files.extend(provider.swift_support_files)
-    transitive_binaries = depset(transitive = transitive_binary_sets)
 
+    direct_binaries = []
     if binary_artifact and swift_support.uses_swift(ctx.attr.deps):
-        transitive_binaries = depset(
-            direct = [binary_artifact],
-            transitive = [transitive_binaries],
-        )
+        direct_binaries.append(binary_artifact)
+
+    transitive_binaries = depset(
+        direct = direct_binaries,
+        transitive = transitive_binary_sets,
+    )
 
     bundle_files = []
-    propagated_binaries = depset([])
     if bundle_dylibs:
+        propagated_binaries = depset()
         binaries_to_check = transitive_binaries.to_list()
         if binaries_to_check:
             platform_name = platform_support.platform(ctx).name_in_plist.lower()
@@ -133,7 +139,9 @@ def _swift_dylibs_partial_impl(
             swift_support_file = (platform_name, output_dir)
             transitive_swift_support_files.append(swift_support_file)
 
-        if package_swift_support:
+        swift_support_requested = defines.bool_value(ctx, "apple.package_swift_support", True)
+        needs_swift_support = platform_support.is_device_build(ctx) and swift_support_requested
+        if package_swift_support_if_needed and needs_swift_support:
             # Package all the transitive SwiftSupport dylibs into the archive for this target.
             bundle_files.extend([
                 (
@@ -163,7 +171,7 @@ def swift_dylibs_partial(
         binary_artifact,
         dependency_targets = [],
         bundle_dylibs = False,
-        package_swift_support = False):
+        package_swift_support_if_needed = False):
     """Constructor for the Swift dylibs processing partial.
 
     This partial handles the Swift dylibs that may need to be packaged or propagated.
@@ -174,8 +182,9 @@ def swift_dylibs_partial(
         Swift, so that the Swift dylibs can be collected.
       bundle_dylibs: Whether the partial should return the Swift files to be bundled inside the
         target's bundle.
-      package_swift_support: Whether the partial should also bundle the Swift dylib for each
-        dependency platform into the SwiftSupport directory at the root of the archive.
+      package_swift_support_if_needed: Whether the partial should also bundle the Swift dylib for
+        each dependency platform into the SwiftSupport directory at the root of the archive. It
+        might still not be included depending on what it is being built for.
 
     Returns:
       A partial that returns the bundle location of the Swift dylibs and propagates dylib
@@ -186,5 +195,5 @@ def swift_dylibs_partial(
         binary_artifact = binary_artifact,
         dependency_targets = dependency_targets,
         bundle_dylibs = bundle_dylibs,
-        package_swift_support = package_swift_support,
+        package_swift_support_if_needed = package_swift_support_if_needed,
     )

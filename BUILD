@@ -1,5 +1,3 @@
-package(default_visibility = ["//visibility:public"])
-
 licenses(["notice"])
 
 exports_files(["LICENSE"])
@@ -23,4 +21,5 @@ filegroup(
         "@build_bazel_apple_support//:for_bazel_tests",
         "@build_bazel_rules_swift//:for_bazel_tests",
     ],
+    visibility = ["//:__subpackages__"],
 )

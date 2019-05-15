@@ -19,20 +19,20 @@ load(
     "apple_support",
 )
 load(
-    "@build_bazel_rules_apple//apple/bundling:bundling_support.bzl",
+    "@build_bazel_rules_apple//apple/internal/utils:defines.bzl",
+    "defines",
+)
+load(
+    "@build_bazel_rules_apple//apple/internal:bundling_support.bzl",
     "bundling_support",
 )
 load(
-    "@build_bazel_rules_apple//apple/bundling:linker_support.bzl",
-    "linker_support",
+    "@build_bazel_rules_apple//apple/internal:linking_support.bzl",
+    "linking_support",
 )
 load(
-    "@build_bazel_rules_apple//apple/bundling:platform_support.bzl",
+    "@build_bazel_rules_apple//apple/internal:platform_support.bzl",
     "platform_support",
-)
-load(
-    "@build_bazel_rules_apple//apple/internal/utils:defines.bzl",
-    "defines",
 )
 load(
     "@build_bazel_rules_apple//apple/internal:resource_actions.bzl",
@@ -282,7 +282,7 @@ def _entitlements_impl(ctx):
     # the binary; for device builds, the entitlements are applied during signing.
     if not is_device:
         return [
-            linker_support.sectcreate_objc_provider(
+            linking_support.sectcreate_objc_provider(
                 "__TEXT",
                 "__entitlements",
                 final_entitlements,

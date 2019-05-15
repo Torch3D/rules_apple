@@ -1,4 +1,4 @@
-# Copyright 2017 The Bazel Authors. All rights reserved.
+# Copyright 2019 The Bazel Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -141,6 +141,7 @@ AppleResourceInfo = provider(
         "infoplists": """Plist files to be merged and processed. Plist files that should not be
 merged into the root Info.plist should be propagated in `plists`. Because of this, infoplists should
 only be bucketed with the `bucketize_typed` method.""",
+        "mlmodels": "Core ML model files that should be processed and bundled at the top level.",
         "plists": "Resource Plist files that should not be merged into Info.plist",
         "pngs": "PNG images which are not bundled in an .xcassets folder.",
         # TODO(b/113252360): Remove this once we can correctly process Fileset files.
@@ -310,6 +311,18 @@ requirement.
 """,
 )
 
+MacosQuickLookPluginBundleInfo = provider(
+    doc = """
+Denotes that a target is a macOS Quick Look Generator bundle.
+
+This provider does not contain any fields of its own at this time but is used as
+a "marker" to indicate that a target is specifically a macOS Quick Look generator
+bundle (and not some other Apple bundle). Rule authors who wish to require that
+a dependency is a macOS Quick Look generator should use this provider to describe
+that requirement.
+""",
+)
+
 MacosSpotlightImporterBundleInfo = provider(
     doc = """
 Denotes that a target is a macOS Spotlight Importer bundle.
@@ -367,6 +380,29 @@ a "marker" to indicate that a target is specifically a tvOS application
 extension bundle (and not some other Apple bundle). Rule authors who wish to
 require that a dependency is a tvOS application extension should use this
 provider to describe that requirement.
+""",
+)
+
+TvosFrameworkBundleInfo = provider(
+    doc = """
+Denotes that a target is a tvOS dynamic framework.
+
+This provider does not contain any fields of its own at this time but is used as
+a "marker" to indicate that a target is specifically a tvOS dynamic framework
+bundle (and not some other Apple bundle). Rule authors who wish to require that
+a dependency is a tvOS dynamic framework should use this provider to describe
+that requirement.
+""",
+)
+
+TvosXcTestBundleInfo = provider(
+    doc = """
+Denotes a target that is a tvOS .xctest bundle.
+
+This provider does not contain any fields of its own at this time but is used as
+a "marker" to indicate that a target is specifically a tvOS .xctest bundle (and
+not some other Apple bundle). Rule authors who wish to require that a dependency
+is a tvOS .xctest bundle should use this provider to describe that requirement.
 """,
 )
 

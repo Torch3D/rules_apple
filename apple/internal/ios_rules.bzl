@@ -12,19 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Experimental implementation of iOS rules."""
+"""Implementation of iOS rules."""
 
-load(
-    "@build_bazel_rules_apple//apple/bundling:platform_support.bzl",
-    "platform_support",
-)
-load(
-    "@build_bazel_rules_apple//apple/bundling:run_actions.bzl",
-    "run_actions",
-)
 load(
     "@build_bazel_rules_apple//apple/internal:apple_product_type.bzl",
     "apple_product_type",
+)
+load(
+    "@build_bazel_rules_apple//apple/internal:linking_support.bzl",
+    "linking_support",
 )
 load(
     "@build_bazel_rules_apple//apple/internal:outputs.bzl",
@@ -33,6 +29,10 @@ load(
 load(
     "@build_bazel_rules_apple//apple/internal:partials.bzl",
     "partials",
+)
+load(
+    "@build_bazel_rules_apple//apple/internal:platform_support.bzl",
+    "platform_support",
 )
 load(
     "@build_bazel_rules_apple//apple/internal:processor.bzl",
@@ -45,6 +45,10 @@ load(
 load(
     "@build_bazel_rules_apple//apple/internal:rule_support.bzl",
     "rule_support",
+)
+load(
+    "@build_bazel_rules_apple//apple/internal:run_support.bzl",
+    "run_support",
 )
 load(
     "@build_bazel_rules_apple//apple/internal:stub_support.bzl",
@@ -127,9 +131,7 @@ def _ios_application_impl(ctx):
             binary_artifact = binary_artifact,
             dependency_targets = embeddable_targets,
             bundle_dylibs = True,
-            # TODO(kaipi): Revisit if we can add this only for AppStore optimized builds, or at
-            # least only for device builds.
-            package_swift_support = True,
+            package_swift_support_if_needed = True,
         ),
     ]
 
@@ -153,22 +155,27 @@ def _ios_application_impl(ctx):
 
     processor_result = processor.process(ctx, processor_partials)
 
-    return struct(
+    executable = outputs.executable(ctx)
+    run_support.register_simulator_executable(ctx, executable)
+
+    return [
         # TODO(b/121155041): Should we do the same for ios_framework and ios_extension?
-        instrumented_files = struct(dependency_attributes = ["binary"]),
-        providers = [
-            DefaultInfo(
-                files = processor_result.output_files,
-                runfiles = ctx.runfiles(
-                    files = run_actions.start_simulator(ctx),
-                ),
+        coverage_common.instrumented_files_info(ctx, dependency_attributes = ["deps"]),
+        DefaultInfo(
+            executable = executable,
+            files = processor_result.output_files,
+            runfiles = ctx.runfiles(
+                files = [
+                    outputs.archive(ctx),
+                    ctx.file._std_redirect_dylib,
+                ],
             ),
-            IosApplicationBundleInfo(),
-            # Propagate the binary provider so that this target can be used as bundle_loader in test
-            # rules.
-            binary_target[apple_common.AppleExecutableBinary],
-        ] + processor_result.providers,
-    )
+        ),
+        IosApplicationBundleInfo(),
+        # Propagate the binary provider so that this target can be used as bundle_loader in test
+        # rules.
+        binary_target[apple_common.AppleExecutableBinary],
+    ] + processor_result.providers
 
 def _ios_framework_impl(ctx):
     """Experimental implementation of ios_framework."""
@@ -204,7 +211,9 @@ def _ios_framework_impl(ctx):
         ),
         partials.extension_safe_validation_partial(is_extension_safe = ctx.attr.extension_safe),
         partials.framework_headers_partial(hdrs = ctx.files.hdrs),
-        partials.framework_provider_partial(),
+        partials.framework_provider_partial(
+            binary_provider = binary_target[apple_common.AppleDylibBinary],
+        ),
         partials.resources_partial(
             bundle_id = bundle_id,
             plist_attrs = ["infoplists"],
@@ -360,9 +369,7 @@ def _ios_imessage_application_impl(ctx):
             binary_artifact = None,
             dependency_targets = [ctx.attr.extension],
             bundle_dylibs = True,
-            # TODO(kaipi): Revisit if we can add this only for AppStore optimized builds, or at
-            # least only for device builds.
-            package_swift_support = True,
+            package_swift_support_if_needed = True,
         ),
     ]
 
@@ -387,10 +394,9 @@ def _ios_imessage_extension_impl(ctx):
         "strings",
     ]
 
-    binary_provider_struct = apple_common.link_multi_arch_binary(ctx = ctx)
-    binary_provider = binary_provider_struct.binary_provider
-    debug_outputs_provider = binary_provider_struct.debug_outputs_provider
-    binary_artifact = binary_provider.binary
+    binary_descriptor = linking_support.register_linking_action(ctx)
+    binary_artifact = binary_descriptor.artifact
+    debug_outputs_provider = binary_descriptor.debug_outputs_provider
 
     bundle_id = ctx.attr.bundle_id
 

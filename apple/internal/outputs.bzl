@@ -19,7 +19,7 @@ registered to generate these files.
 """
 
 load(
-    "@build_bazel_rules_apple//apple/bundling:bundling_support.bzl",
+    "@build_bazel_rules_apple//apple/internal:bundling_support.bzl",
     "bundling_support",
 )
 load(
@@ -62,6 +62,10 @@ def _binary(ctx):
         bundling_support.bundle_name(ctx),
     )
 
+def _executable(ctx):
+    """Returns a file reference for the executable that would be invoked with `bazel run`."""
+    return ctx.actions.declare_file(ctx.label.name)
+
 def _infoplist(ctx):
     """Returns a file reference for this target's Info.plist file."""
     return intermediates.file(ctx.actions, ctx.label.name, "Info.plist")
@@ -70,5 +74,6 @@ outputs = struct(
     archive = _archive,
     archive_root_path = _archive_root_path,
     binary = _binary,
+    executable = _executable,
     infoplist = _infoplist,
 )

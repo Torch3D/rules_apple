@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Rules related to Apple bundle versioning."""
+
 load(
     "@build_bazel_rules_apple//apple:providers.bzl",
     "AppleBundleVersionInfo",
@@ -24,6 +26,7 @@ def _collect_group_names(s):
 
     Args:
       s: The string that potentially contains placeholders.
+
     Returns:
       A list of placeholder names found in the string, if any.
     """
@@ -129,10 +132,10 @@ def _apple_bundle_version_impl(ctx):
         mnemonic = "AppleBundleVersion",
     )
 
-    return struct(
-        files = depset([bundle_version_file]),
-        providers = [AppleBundleVersionInfo(version_file = bundle_version_file)],
-    )
+    return [
+        AppleBundleVersionInfo(version_file = bundle_version_file),
+        DefaultInfo(files = depset([bundle_version_file])),
+    ]
 
 apple_bundle_version = rule(
     _apple_bundle_version_impl,

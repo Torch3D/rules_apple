@@ -15,16 +15,16 @@
 """Internal helper definitions used by macOS command line rules."""
 
 load(
-    "@build_bazel_rules_apple//apple/bundling:linker_support.bzl",
-    "linker_support",
-)
-load(
     "@build_bazel_rules_apple//apple/internal:apple_product_type.bzl",
     "apple_product_type",
 )
 load(
     "@build_bazel_rules_apple//apple/internal:intermediates.bzl",
     "intermediates",
+)
+load(
+    "@build_bazel_rules_apple//apple/internal:linking_support.bzl",
+    "linking_support",
 )
 load(
     "@build_bazel_rules_apple//apple/internal:resource_actions.bzl",
@@ -85,7 +85,7 @@ def _macos_binary_infoplist_impl(ctx):
     )
 
     return [
-        linker_support.sectcreate_objc_provider(
+        linking_support.sectcreate_objc_provider(
             "__TEXT",
             "__info_plist",
             merged_infoplist,
@@ -138,7 +138,7 @@ def _macos_command_line_launchdplist_impl(ctx):
     )
 
     return [
-        linker_support.sectcreate_objc_provider(
+        linking_support.sectcreate_objc_provider(
             "__TEXT",
             "__launchd_plist",
             merged_launchdplist,

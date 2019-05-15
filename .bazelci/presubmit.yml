@@ -1,10 +1,15 @@
 ---
-platforms:
-  macos:
+tasks:
+  macos_latest:
+    name: "Latest Bazel"
+    platform: macos
+    # TODO(b/130360213): Remove this default to use whatever the default in
+    # BuildKite is.
+    xcode_version: "10.1"
+    bazel: latest
     build_targets:
     - "tools/..."
     - "test/..."
-    - "examples:ci_build_targets"
     test_flags:
     - "--spawn_strategy=local"
     - "--test_env=PATH"
@@ -16,3 +21,34 @@ platforms:
     - "tools/..."
     - "test/..."
     - "examples/..."
+
+  macos_last_green:
+    name: "Last Green Bazel"
+    platform: macos
+    # TODO(b/130360213): Remove this default to use whatever the default in
+    # BuildKite is.
+    xcode_version: "10.1"
+    bazel: last_green
+    build_targets:
+    - "tools/..."
+    - "test/..."
+    test_flags:
+    - "--spawn_strategy=local"
+    - "--test_env=PATH"
+    # `bazel test` tries to build everything also by default, so skip that so the
+    # *_library targets in examples/... aren't built (and fail since they are
+    # platform specific).
+    - "--build_tests_only"
+    test_targets:
+    - "tools/..."
+    - "test/..."
+    - "examples/..."
+
+buildifier:
+  version: latest
+  # Until there is a release with the fixes, a few warnings have to be shut off.
+  # - https://github.com/bazelbuild/buildtools/issues/549
+  # - https://github.com/bazelbuild/buildtools/issues/550
+  # - https://github.com/bazelbuild/buildtools/issues/576
+  # - https://github.com/bazelbuild/buildtools/issues/577
+  warnings: -duplicated-name,-uninitialized,-function-docstring

@@ -297,6 +297,16 @@ ENTITLEMENTS_APS_ENVIRONMENT_MISMATCH = (
     'match the value in the provisioning profile ("%s").'
 )
 
+ENTITLEMENTS_BETA_REPORTS_ACTIVE_MISMATCH = (
+    'In target "%s"; the entitlements "beta-reports-active" ("%s") did not '
+    'match the value in the provisioning profile ("%s").'
+)
+
+ENTITLEMENTS_BETA_REPORTS_ACTIVE_MISSING_PROFILE = (
+    'In target "%s"; the entitlements file has "beta-reports-active" ("%s") '
+    'but it does not exist in the profile.'
+)
+
 ENTITLEMENTS_HAS_GROUP_ENTRY_PROFILE_DOES_NOT = (
     'Target "%s" uses entitlements "%s" value of "%s", but the profile does '
     'not support it (["%s"]).'
@@ -367,7 +377,7 @@ _RFC1034_RE = re.compile(r'[^0-9A-Za-z.]')
 #     value that is >= 1. That is *not* going to be enforced since using 0.x.y
 #     very early in a project is common and at this level there is no way to
 #     really tell if this is a Release/AppStore build or not.
-#   - NOTE: While the docs all say 3 segments, enterprise builsd (and
+#   - NOTE: While the docs all say 3 segments, enterprise builds (and
 #     TestFlight?) are perfectly happy with 4 segment, so 4 is allowed.
 # - TechNote also lists an 18 characters max
 CF_BUNDLE_VERSION_RE = re.compile(
@@ -1176,6 +1186,18 @@ class EntitlementsTask(PlistToolTask):
                 self.target, aps_environment, profile_aps_environment),
               **report_extras)
 
+    # If beta-reports-active is in either the profile or the entitlements file
+    # it must be in both or the upload will get rejected by Apple
+    beta_reports_active = entitlements.get('beta-reports-active')
+    profile_key = (profile_entitlements or {}).get('beta-reports-active')
+    if beta_reports_active is not None and profile_key != beta_reports_active:
+      error_msg = ENTITLEMENTS_BETA_REPORTS_ACTIVE_MISMATCH % (
+        self.target, beta_reports_active, profile_key)
+      if profile_key is None:
+        error_msg = ENTITLEMENTS_BETA_REPORTS_ACTIVE_MISSING_PROFILE % (
+          self.target, beta_reports_active)
+      self._report(error_msg, **report_extras)
+
     # keychain-access-groups
     self._check_entitlements_array(
         entitlements, profile_entitlements,
@@ -1279,7 +1301,7 @@ class EntitlementsTask(PlistToolTask):
       return
 
     if not profile_entitlements:
-      return  # backdoor for tests to not have to have the metadata.
+      return  # Allow no profile_entitlements just for the plisttool_unittests.
 
     if report_extras is None:
       report_extras = dict()

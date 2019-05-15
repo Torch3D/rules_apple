@@ -1,4 +1,4 @@
-# Copyright 2018 The Bazel Authors. All rights reserved.
+# Copyright 2019 The Bazel Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -56,7 +56,9 @@ load(
     "MacosApplicationBundleInfo",
     "MacosExtensionBundleInfo",
     "MacosXPCServiceBundleInfo",
+    "TvosApplicationBundleInfo",
     "TvosExtensionBundleInfo",
+    "TvosFrameworkBundleInfo",
     "WatchosApplicationBundleInfo",
     "WatchosExtensionBundleInfo",
 )
@@ -103,7 +105,7 @@ _COMMON_PRIVATE_TOOL_ATTRS = dicts.add(
             cfg = "host",
             allow_single_file = True,
             default = Label(
-                "@build_bazel_rules_apple//apple/bundling:dsym_info_plist_template",
+                "@build_bazel_rules_apple//apple/internal/templates:dsym_info_plist_template",
             ),
         ),
         "_environment_plist": attr.label(
@@ -133,7 +135,12 @@ _COMMON_PRIVATE_TOOL_ATTRS = dicts.add(
         "_runner_template": attr.label(
             cfg = "host",
             allow_single_file = True,
-            default = Label("@build_bazel_rules_apple//apple/bundling/runners:ios_sim_template"),
+            default = Label("@build_bazel_rules_apple//apple/internal/templates:ios_sim_template"),
+        ),
+        "_macos_runner_template": attr.label(
+            cfg = "host",
+            allow_single_file = True,
+            default = Label("@build_bazel_rules_apple//apple/internal/templates:macos_template"),
         ),
         "_std_redirect_dylib": attr.label(
             cfg = "host",
@@ -156,12 +163,6 @@ _COMMON_PRIVATE_TOOL_ATTRS = dicts.add(
 
 def _common_binary_linking_attrs(rule_descriptor):
     return {
-        # TODO(kaipi): Remove when all rules use the internal/rule_factory.bzl API. Check that Tulsi
-        # isn't using this for some reason.
-        "binary": attr.label(
-            allow_single_file = True,
-            mandatory = False,
-        ),
         "binary_type": attr.string(
             default = rule_descriptor.binary_type,
             doc = """
@@ -308,10 +309,10 @@ hermetic given these inputs to ensure that the result can be safely cached.
 """,
         ),
         "minimum_os_version": attr.string(
+            mandatory = True,
             doc = """
-An optional string indicating the minimum OS version supported by the target, represented as a
-dotted version number (for example, "9.0"). If this attribute is omitted, then the value specified
-by the flag `--ios_minimum_os` will be used instead.
+A required string indicating the minimum OS version supported by the target, represented as a
+dotted version number (for example, "9.0").
 """,
         ),
         "strings": attr.label_list(
@@ -622,6 +623,51 @@ def _get_tvos_attrs(rule_descriptor):
                 doc = "A list of tvOS extensions to include in the final application bundle.",
             ),
         })
+    elif rule_descriptor.product_type == apple_product_type.framework:
+        attrs.append({
+            # TODO(kaipi): This attribute is not publicly documented, but it is tested in
+            # http://github.com/bazelbuild/rules_apple/test/ios_framework_test.sh?l=79. Figure out
+            # what to do with this.
+            "hdrs": attr.label_list(
+                allow_files = [".h"],
+            ),
+            "extension_safe": attr.bool(
+                default = False,
+                doc = """
+If true, compiles and links this framework with `-application-extension`, restricting the binary to
+use only extension-safe APIs.
+""",
+            ),
+        })
+
+    elif _is_test_product_type(rule_descriptor.product_type):
+        test_host_mandatory = rule_descriptor.product_type == apple_product_type.ui_test_bundle
+        attrs.append({
+            "test_host": attr.label(
+                aspects = [framework_import_aspect],
+                mandatory = test_host_mandatory,
+                providers = [AppleBundleInfo, TvosApplicationBundleInfo],
+            ),
+        })
+
+    # TODO(kaipi): Once all platforms have framework rules, move this into
+    # _common_binary_linking_attrs().
+    if rule_descriptor.requires_deps:
+        extra_args = {}
+        if rule_descriptor.product_type == apple_product_type.application:
+            extra_args["aspects"] = [framework_import_aspect]
+
+        attrs.append({
+            "frameworks": attr.label_list(
+                providers = [[AppleBundleInfo, TvosFrameworkBundleInfo]],
+                doc = """
+A list of framework targets (see
+[`tvos_framework`](https://github.com/bazelbuild/rules_apple/blob/master/doc/rules-tvos.md#tvos_framework))
+that this target depends on.
+""",
+                **extra_args
+            ),
+        })
 
     return attrs
 
@@ -684,11 +730,6 @@ required for device builds.
         })
 
     attrs.append({
-        # TODO(kaipi): Remove when all rules use the internal/rule_factory.bzl API.
-        "binary": attr.label(
-            allow_single_file = True,
-            mandatory = True,
-        ),
         "bundle_id": attr.string(
             doc = """
 The bundle ID (reverse-DNS path followed by app name) of the command line application. If present,
@@ -705,10 +746,10 @@ for what is supported.
 """,
         ),
         "minimum_os_version": attr.string(
+            mandatory = True,
             doc = """
-An optional string indicating the minimum macOS version supported by the target, represented as a
-dotted version number (for example, "10.11"). If this attribute is omitted, then the value specified
-by the flag --macos_minimum_os will be used instead.
+A required string indicating the minimum OS version supported by the target, represented as a
+dotted version number (for example, "10.11").
 """,
         ),
         "version": attr.label(

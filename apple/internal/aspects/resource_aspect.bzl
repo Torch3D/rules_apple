@@ -69,11 +69,12 @@ def _apple_resource_aspect_impl(target, ctx):
         if ctx.rule.attr.srcs or ctx.rule.attr.non_arc_srcs or ctx.rule.attr.deps:
             owner = str(ctx.label)
 
-        # Collect objc_library's bundles dependencies and propagate them.
-        providers.extend([
-            x[AppleResourceInfo]
-            for x in ctx.rule.attr.bundles
-        ])
+        if hasattr(ctx.rule.attr, "bundles"):
+            # Collect objc_library's bundles dependencies and propagate them.
+            providers.extend([
+                x[AppleResourceInfo]
+                for x in ctx.rule.attr.bundles
+            ])
 
     elif ctx.rule.kind == "swift_library":
         bucketize_args["swift_module"] = target[SwiftInfo].module_name
@@ -90,8 +91,9 @@ def _apple_resource_aspect_impl(target, ctx):
     elif apple_common.Objc in target:
         # TODO(kaipi): Clean up usages of the ObjcProvider as means to propagate resources, then
         # remove this case.
-        if hasattr(target[apple_common.Objc], "merge_zip"):
-            merge_zips = target[apple_common.Objc].merge_zip.to_list()
+        resource_zips = getattr(target[apple_common.Objc], "merge_zip", None)
+        if resource_zips:
+            merge_zips = resource_zips.to_list()
             merge_zips_provider = resources.bucketize_typed(
                 merge_zips,
                 bucket_type = "resource_zips",

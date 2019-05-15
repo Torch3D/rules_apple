@@ -15,16 +15,16 @@
 """IBTool related actions."""
 
 load(
-    "@build_bazel_rules_apple//apple/bundling:platform_support.bzl",
-    "platform_support",
-)
-load(
     "@build_bazel_rules_apple//apple/internal/utils:legacy_actions.bzl",
     "legacy_actions",
 )
 load(
     "@build_bazel_rules_apple//apple/internal/utils:xctoolrunner.bzl",
     "xctoolrunner",
+)
+load(
+    "@build_bazel_rules_apple//apple/internal:platform_support.bzl",
+    "platform_support",
 )
 load(
     "@bazel_skylib//lib:collections.bzl",
@@ -45,6 +45,7 @@ def _ibtool_arguments(min_os, families):
     Args:
       min_os: The minimum OS version to use when compiling interface files.
       families: The families that should be supported by the compiled interfaces.
+
     Returns:
       An array of command-line arguments to pass to ibtool.
     """

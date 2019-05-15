@@ -1,6 +1,5 @@
 # Apple Rules for [Bazel](https://bazel.build)
 
-[![Build Status](https://travis-ci.org/bazelbuild/rules_apple.svg?branch=master)](https://travis-ci.org/bazelbuild/rules_apple)
 [![Build status](https://badge.buildkite.com/cecd8d6951d939c6814f043af2935158f0556cb6c5fef3cb75.svg?branch=master)](https://buildkite.com/bazel/rules-apple-darwin)
 
 This repository contains rules for [Bazel](https://bazel.build) that can be
@@ -16,7 +15,7 @@ available from [rules_swift](https://github.com/bazelbuild/rules_swift).
 
 ## Reference documentation
 
-[Click here](https://github.com/bazelbuild/rules_apple/tree/master/doc/index.md)
+[Click here](https://github.com/bazelbuild/rules_apple/tree/master/doc)
 for the reference documentation for the rules and other definitions in this
 repository.
 
@@ -32,7 +31,7 @@ load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 git_repository(
     name = "build_bazel_rules_apple",
     remote = "https://github.com/bazelbuild/rules_apple.git",
-    tag = "0.12.0",
+    tag = "0.14.0",
 )
 
 load(
@@ -55,20 +54,6 @@ load(
 )
 
 apple_support_dependencies()
-```
-
-If you're going to use `ios_unit_test` or `ios_ui_test`, you'll also need to add
-the following to your `WORKSPACE`, which is an external dependency needed to run
-the tests.
-
-```python
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
-
-http_file(
-    name = "xctestrunner",
-    executable = 1,
-    urls = ["https://github.com/google/xctestrunner/releases/download/0.2.6/ios_test_runner.par"],
-)
 ```
 
 ## Examples

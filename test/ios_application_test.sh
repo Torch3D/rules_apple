@@ -656,7 +656,7 @@ ios_application(
 objc_library(
     name = "resLib",
     srcs = ["@bazel_tools//tools/objc:dummy.c"],
-    bundles = [":appResources"],
+    data = [":appResources"],
 )
 
 apple_resource_bundle(
@@ -717,7 +717,7 @@ function test_prebuilt_static_apple_static_framework_import_resources() {
 
   do_build ios //app:app || fail "Should build"
 
-  # Verify that it's not bundled.
+  # Verify that it's not converted to binary.
   assert_plist_is_text "test-bin/app/app.ipa" \
       "Payload/app.app/fmwk.bundle/Some.plist"
 }
@@ -743,28 +743,6 @@ function test_prebuilt_dynamic_apple_framework_import_dependency() {
       "Payload/app.app/Frameworks/fmwk.framework/Headers/fmwk.h"
   assert_zip_not_contains "test-bin/app/app.ipa" \
       "Payload/app.app/Frameworks/fmwk.framework/Modules/module.modulemap"
-}
-
-# Tests that the build fails if the user tries to provide their own value for
-# the "binary" attribute.
-function test_build_fails_if_binary_attribute_used() {
-  create_common_files
-
-  cat >> app/BUILD <<EOF
-ios_application(
-    name = "app",
-    binary = ":ThisShouldNotBeAllowed",
-    bundle_id = "my.bundle.id",
-    families = ["iphone"],
-    infoplists = ["Info.plist"],
-    minimum_os_version = "9.0",
-    provisioning_profile = "@build_bazel_rules_apple//test/testdata/provisioning:integration_testing_ios.mobileprovision",
-    deps = [":lib"],
-)
-EOF
-
-  ! do_build ios //app:app || fail "Should fail"
-  expect_log "Do not provide your own binary"
 }
 
 # Helper for empty segment build id failures.
@@ -903,6 +881,15 @@ EOF
 
   assert_equals "9.8.7" "$(cat "test-genfiles/app/CFBundleVersion")"
   assert_equals "6.5" "$(cat "test-genfiles/app/CFBundleShortVersionString")"
+}
+
+# Tests tree artifacts builds and disable codesigning for simulator play along.
+function test_tree_artifacts_and_disable_simulator_codesigning() {
+  create_common_files
+  create_minimal_ios_application
+  do_build ios //app:app \
+      --define=apple.experimental.tree_artifact_outputs=yes \
+      --define=apple.codesign_simulator_bundles=no || fail "Should build"
 }
 
 run_suite "ios_application bundling tests"

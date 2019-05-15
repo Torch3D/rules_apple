@@ -111,6 +111,14 @@ have added it):
 bazel build --define=apple.add_debugger_entitlement=no //your/target
 ```
 
+### Force ipa compression {#apple.compress_ipa}
+
+By default the final `App.ipa` produced from building an app is
+uncompressed, unless you're building with `--compilation_mode=opt`. This
+flag allows you to force compression if the size is more important than
+the CPU time for your build. To use this pass
+`--define=apple.compress_ipa=(yes|true|1)` to `bazel build`.
+
 ### Include Embedded Bundles in Rule Output {#apple.propagate_embedded_extra_outputs}
 
 Some Apple bundles include other bundles within them (for example, an
@@ -126,6 +134,13 @@ can pass `--define=apple.propagate_embedded_extra_outputs=(yes|true|1)` to
 ```shell
 bazel build --define=apple.propagate_embedded_extra_outputs=yes //your/target
 ```
+
+### Disable `SwiftSupport` in ipas
+
+The SwiftSupport directory in a final ipa is only necessary if you're
+shipping the build to Apple. If you want to disable bundling
+SwiftSupport in your ipa for other device or enterprise builds, you can
+pass `--define=apple.package_swift_support=no` to `bazel build`
 
 ### Codesign Bundles for the Simulator {#apple.codesign_simulator_bundles}
 

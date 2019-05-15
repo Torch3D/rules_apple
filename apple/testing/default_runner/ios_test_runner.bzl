@@ -16,28 +16,26 @@
 
 load(
     "@build_bazel_rules_apple//apple/testing:apple_test_rules.bzl",
-    "AppleTestRunner",
+    "AppleTestRunnerInfo",
 )
 
 def _get_template_substitutions(ctx):
     """Returns the template substitutions for this runner."""
-    test_env = ctx.configuration.test_env
     subs = {
         "device_type": ctx.attr.device_type,
         "os_version": ctx.attr.os_version,
-        "test_env": ",".join([k + "=" + v for (k, v) in test_env.items()]),
         "testrunner_binary": ctx.executable._testrunner.short_path,
     }
     return {"%(" + k + ")s": subs[k] for k in subs}
 
-def _get_test_environment(ctx):
-    """Returns the test environment for this runner."""
-    test_environment = dict(ctx.configuration.test_env)
+def _get_execution_environment(ctx):
+    """Returns environment variables the test runner requires"""
+    execution_environment = {}
     xcode_version = str(ctx.attr._xcode_config[apple_common.XcodeVersionConfig].xcode_version())
     if xcode_version:
-        test_environment["XCODE_VERSION"] = xcode_version
+        execution_environment["XCODE_VERSION"] = xcode_version
 
-    return test_environment
+    return execution_environment
 
 def _ios_test_runner_impl(ctx):
     """Implementation for the ios_test_runner rule."""
@@ -47,10 +45,10 @@ def _ios_test_runner_impl(ctx):
         substitutions = _get_template_substitutions(ctx),
     )
     return [
-        AppleTestRunner(
+        AppleTestRunnerInfo(
             test_runner_template = ctx.outputs.test_runner_template,
             execution_requirements = ctx.attr.execution_requirements,
-            test_environment = _get_test_environment(ctx),
+            execution_environment = _get_execution_environment(ctx),
         ),
         DefaultInfo(
             runfiles = ctx.runfiles(
@@ -100,7 +98,7 @@ By default, it is the latest supported version of the device type.'
             executable = True,
             cfg = "host",
             doc = """
-It is the rule that needs to provide the AppleTestRunner provider. This
+It is the rule that needs to provide the AppleTestRunnerInfo provider. This
 dependency is the test runner binary.
 """,
         ),
@@ -122,7 +120,7 @@ The runner will create a new simulator according to the given arguments to run
 tests.
 
 Outputs:
-  AppleTestRunner:
+  AppleTestRunnerInfo:
     test_runner_template: Template file that contains the specific mechanism
         with which the tests will be performed.
     execution_requirements: Dictionary that represents the specific hardware

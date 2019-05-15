@@ -60,16 +60,12 @@ rule.
 """
 
 load(
-    "@build_bazel_rules_apple//apple/bundling:bundling_support.bzl",
+    "@build_bazel_rules_apple//apple/internal:bundling_support.bzl",
     "bundling_support",
 )
 load(
-    "@build_bazel_rules_apple//apple/bundling:platform_support.bzl",
-    "platform_support",
-)
-load(
-    "@build_bazel_rules_apple//apple/internal:codesigning_actions.bzl",
-    "codesigning_actions",
+    "@build_bazel_rules_apple//apple/internal:codesigning_support.bzl",
+    "codesigning_support",
 )
 load(
     "@build_bazel_rules_apple//apple/internal:entitlements_support.bzl",
@@ -82,6 +78,10 @@ load(
 load(
     "@build_bazel_rules_apple//apple/internal:intermediates.bzl",
     "intermediates",
+)
+load(
+    "@build_bazel_rules_apple//apple/internal:platform_support.bzl",
+    "platform_support",
 )
 load(
     "@build_bazel_rules_apple//apple/internal:outputs.bzl",
@@ -212,8 +212,7 @@ def _bundle_partial_outputs_files(
         partial_outputs,
         output_file,
         codesigning_command = None,
-        extra_input_files = [],
-        post_processor_path = None):
+        extra_input_files = []):
     """Invokes bundletool to bundle the files specified by the partial outputs.
 
     Args:
@@ -224,8 +223,6 @@ def _bundle_partial_outputs_files(
       codesigning_command: When building tree artifact outputs, the command to codesign the output
           bundle.
       extra_input_files: Extra files to include in the bundling action.
-      post_processor_path: When building tree artifact outputs, the path to the post processor
-          script.
     """
     control_files = []
     control_zips = []
@@ -244,9 +241,10 @@ def _bundle_partial_outputs_files(
                 continue
             if (invalid_top_level_dirs and
                 not _is_parent_dir_valid(invalid_top_level_dirs, parent_dir)):
+                file_paths = "\n".join([f.path for f in files.to_list()])
                 fail(("Error: For %s bundles, the following top level " +
-                      "directories are invalid: %s") %
-                     (platform_type, ", ".join(invalid_top_level_dirs)))
+                      "directories are invalid: %s, check input files:\n%s") %
+                     (platform_type, ", ".join(invalid_top_level_dirs), file_paths))
 
             sources = files.to_list()
             input_files.extend(sources)
@@ -259,7 +257,7 @@ def _bundle_partial_outputs_files(
                     if target_path in processed_file_target_paths:
                         fail(
                             ("Multiple files would be placed at \"%s\" in the bundle, which " +
-                             "is not allowed") % target_path,
+                             "is not allowed. check input file:\n%s") % (target_path, source.path),
                         )
                     processed_file_target_paths[target_path] = None
                 control_files.append(struct(src = source.path, dest = target_path))
@@ -281,12 +279,18 @@ def _bundle_partial_outputs_files(
                 target_path = paths.join(location_to_paths[location], parent_dir or "")
                 control_zips.append(struct(src = source.path, dest = target_path))
 
+    post_processor = ctx.executable.ipa_post_processor
+    post_processor_path = ""
+
+    if post_processor:
+        post_processor_path = post_processor.path
+
     control = struct(
         bundle_merge_files = control_files,
         bundle_merge_zips = control_zips,
         output = output_file.path,
         code_signing_commands = codesigning_command or "",
-        post_processor = post_processor_path or "",
+        post_processor = post_processor_path,
     )
 
     control_file = intermediates.file(
@@ -308,12 +312,17 @@ def _bundle_partial_outputs_files(
     if is_experimental_tree_artifact_enabled(ctx):
         # Since the tree artifact bundler also runs the post processor and codesigning, this
         # action needs to run on a macOS machine.
+
+        bundling_tools = [ctx.executable._codesigningtool]
+        if post_processor:
+            bundling_tools.append(post_processor)
+
         apple_support.run(
             ctx,
             executable = ctx.executable._bundletool_experimental,
             mnemonic = "BundleTreeApp",
             progress_message = "Bundling, processing and signing %s" % ctx.label.name,
-            tools = [ctx.executable._codesigningtool],
+            tools = bundling_tools,
             **action_args
         )
     else:
@@ -338,12 +347,6 @@ def _bundle_post_process_and_sign(ctx, partial_outputs, output_archive):
     if is_experimental_tree_artifact_enabled(ctx):
         extra_input_files = []
 
-        post_processor = ctx.executable.ipa_post_processor
-        post_processor_path = ""
-        if post_processor:
-            extra_input_files.append(post_processor)
-            post_processor_path = post_processor.path
-
         if entitlements:
             extra_input_files.append(entitlements)
 
@@ -351,7 +354,7 @@ def _bundle_post_process_and_sign(ctx, partial_outputs, output_archive):
         if provisioning_profile:
             extra_input_files.append(provisioning_profile)
 
-        codesigning_command = codesigning_actions.codesigning_command(
+        codesigning_command = codesigning_support.codesigning_command(
             ctx,
             entitlements = entitlements,
             frameworks_path = archive_paths[_LOCATION_ENUM.framework],
@@ -363,12 +366,11 @@ def _bundle_post_process_and_sign(ctx, partial_outputs, output_archive):
             output_archive,
             codesigning_command = codesigning_command,
             extra_input_files = extra_input_files,
-            post_processor_path = post_processor_path,
         )
 
         ctx.actions.write(
             output = ctx.outputs.archive,
-            content = "test",
+            content = "This is dummy file because tree artifacts are enabled",
         )
     else:
         # This output, while an intermediate artifact not exposed through the AppleBundleInfo
@@ -384,7 +386,7 @@ def _bundle_post_process_and_sign(ctx, partial_outputs, output_archive):
         frameworks_path = archive_paths[_LOCATION_ENUM.framework]
 
         output_archive_root_path = outputs.archive_root_path(ctx)
-        codesigning_actions.post_process_and_sign_archive_action(
+        codesigning_support.post_process_and_sign_archive_action(
             ctx,
             archive_codesigning_path,
             frameworks_path,
